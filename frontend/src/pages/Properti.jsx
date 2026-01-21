@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
-import { Plus, Edit, Trash2, Building2, Upload, Eye, X } from 'lucide-react'
+import { Plus, Edit, Trash2, Building2, Upload, Eye } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog'
 import { Input } from '../components/ui/Input'
 import { canCreate, canEdit, canDelete, isDemo } from '../lib/auth'
-import api from '../lib/api'
+import { db, storage } from '../lib/supabase'
 
 function Properti() {
   const [showModal, setShowModal] = useState(false)
@@ -28,8 +27,12 @@ function Properti() {
 
   const fetchProperti = async () => {
     try {
-      const response = await api.get('/api/properti')
-      setPropertiList(response.data || [])
+      const { data, error } = await db.properti.getAll()
+      if (error) {
+        console.error('Error fetching properti:', error)
+        return
+      }
+      setPropertiList(data || [])
     } catch (error) {
       console.error('Error fetching properti:', error)
     }
@@ -50,24 +53,49 @@ function Properti() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const formDataToSend = new FormData()
-      formDataToSend.append('nama_unit', formData.nama_unit)
-      formDataToSend.append('tipe', formData.tipe)
-      formDataToSend.append('harga_sewa', formData.harga_sewa)
-      formDataToSend.append('status', formData.status)
+      // Siapkan data properti
+      const propertiData = {
+        nama_unit: formData.nama_unit,
+        tipe: formData.tipe,
+        harga_sewa: parseFloat(formData.harga_sewa),
+        status: formData.status
+      }
+
+      // Upload foto jika ada
       if (selectedFile) {
-        formDataToSend.append('foto', selectedFile)
+        try {
+          const fileName = `${Date.now()}-${selectedFile.name}`
+          const { data: uploadData, error: uploadError } = await storage.upload('properti-photos', fileName, selectedFile)
+          
+          if (uploadError) {
+            console.error('Upload error:', uploadError)
+            alert('Gagal upload foto: ' + uploadError.message)
+            return
+          }
+          
+          propertiData.foto_path = fileName
+        } catch (uploadError) {
+          console.error('Upload error:', uploadError)
+          alert('Gagal upload foto: ' + uploadError.message)
+          return
+        }
       }
       
       if (editingId) {
-        await api.put(`/api/properti/${editingId}`, formDataToSend, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        const { data, error } = await db.properti.update(editingId, propertiData)
+        if (error) {
+          console.error('Update error:', error)
+          alert('Gagal update properti: ' + error.message)
+          return
+        }
         alert('Properti berhasil diupdate!')
       } else {
-        await api.post('/api/properti', formDataToSend, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        const { data, error } = await db.properti.create(propertiData)
+        if (error) {
+          console.error('Create error:', error)
+          alert('Gagal menambah properti: ' + error.message)
+          return
+        }
         alert('Properti berhasil ditambahkan!')
       }
       
@@ -91,19 +119,30 @@ function Properti() {
       status: item.status
     })
     if (item.foto_path) {
-      setPreview(`http://localhost:8080${item.foto_path}`)
+      setPreview(storage.getPublicUrl('properti-photos', item.foto_path))
     }
     setShowModal(true)
   }
 
   const handleDelete = async (id) => {
+    if (!canDelete()) {
+      alert('Anda tidak memiliki izin untuk menghapus data')
+      return
+    }
+    
     if (!confirm('Yakin ingin menghapus properti ini?')) return
     
     try {
-      await api.delete(`/api/properti/${id}`)
+      const { error } = await db.properti.delete(id)
+      if (error) {
+        console.error('Delete error:', error)
+        alert('Gagal menghapus properti: ' + error.message)
+        return
+      }
       alert('Properti berhasil dihapus!')
       fetchProperti()
     } catch (error) {
+      console.error('Delete error:', error)
       alert('Gagal menghapus properti: ' + error.message)
     }
   }
@@ -158,7 +197,7 @@ function Properti() {
               <div className="relative w-full h-48 mb-4 rounded-lg overflow-hidden bg-gray-100">
                 {item.foto_path ? (
                   <img 
-                    src={`http://localhost:8080${item.foto_path}`} 
+                    src={storage.getPublicUrl('properti-photos', item.foto_path)} 
                     alt={item.nama_unit}
                     className="w-full h-full object-cover"
                   />

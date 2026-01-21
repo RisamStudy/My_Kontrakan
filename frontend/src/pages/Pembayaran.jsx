@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
 import { 
   Upload, 
   FileText, 
@@ -22,7 +21,16 @@ import { Badge } from '../components/ui/Badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog'
 import { Input } from '../components/ui/Input'
 import { canCreate, canEdit, canDelete, isDemo, getCurrentUser } from '../lib/auth'
-import api from '../lib/api'
+import { db, storage } from '../lib/supabase'
+
+// Helper functions untuk Supabase storage URLs
+const getStorageUrl = (bucket, path) => {
+  if (!path) return null
+  return storage.getPublicUrl(bucket, path)
+}
+
+const getKwitansiUrl = (path) => getStorageUrl('kwitansi-receipts', path)
+const getKtpUrl = (path) => getStorageUrl('ktp-documents', path)
 
 function Pembayaran() {
   const [showModal, setShowModal] = useState(false)
@@ -117,13 +125,20 @@ function Pembayaran() {
   const fetchData = async () => {
     try {
       const [penyewaRes, propertiRes, pembayaranRes] = await Promise.all([
-        axios.get('/api/penyewa'),
-        axios.get('/api/properti'),
-        axios.get('/api/pembayaran')
+        db.penyewa.getAll(),
+        db.properti.getAll(),
+        db.pembayaran.getAll()
       ])
-      setPenyewaList(penyewaRes.data || [])
-      setPropertiList(propertiRes.data || [])
-      setPembayaranList(pembayaranRes.data || [])
+      
+      if (penyewaRes.error) console.error('Error fetching penyewa:', penyewaRes.error)
+      else setPenyewaList(penyewaRes.data || [])
+      
+      if (propertiRes.error) console.error('Error fetching properti:', propertiRes.error)
+      else setPropertiList(propertiRes.data || [])
+      
+      if (pembayaranRes.error) console.error('Error fetching pembayaran:', pembayaranRes.error)
+      else setPembayaranList(pembayaranRes.data || [])
+      
     } catch (error) {
       console.error('Error fetching data:', error)
     }
@@ -293,32 +308,60 @@ function Pembayaran() {
   const handleSubmitKontrak = async (e) => {
     e.preventDefault()
     try {
-      const kontrakData = new FormData()
-      Object.keys(formData).forEach(key => {
-        kontrakData.append(key, formData[key])
-      })
-      
+      // Siapkan data pembayaran
+      const pembayaranData = {
+        penyewa_id: parseInt(formData.penyewa_id),
+        nominal: parseFloat(formData.total_biaya),
+        uang_dibayar: parseFloat(formData.uang_dibayar),
+        tanggal_bayar: formData.tanggal_mulai,
+        tanggal_mulai: formData.tanggal_mulai,
+        tanggal_akhir: formData.tanggal_akhir,
+        metode_bayar: formData.metode_bayar || 'Transfer',
+        status: 'pending',
+        keterangan: `Kontrak sewa dari ${formData.tanggal_mulai} sampai ${formData.tanggal_akhir}`
+      }
+
+      // Upload kwitansi jika ada
       if (selectedFile) {
-        kontrakData.append('kwitansi', selectedFile)
+        try {
+          const fileName = `${Date.now()}-${selectedFile.name}`
+          const { data: uploadData, error: uploadError } = await storage.upload('kwitansi-receipts', fileName, selectedFile)
+          
+          if (uploadError) {
+            console.error('Upload error:', uploadError)
+            alert('Gagal upload kwitansi: ' + uploadError.message)
+            return
+          }
+          
+          pembayaranData.kwitansi_path = fileName
+        } catch (uploadError) {
+          console.error('Upload error:', uploadError)
+          alert('Gagal upload kwitansi: ' + uploadError.message)
+          return
+        }
       }
 
       // Debug log
       console.log('=== FORM SUBMISSION DEBUG ===')
       console.log('EditingId:', editingId)
-      console.log('FormData:', formData)
+      console.log('PembayaranData:', pembayaranData)
       console.log('SelectedFile:', selectedFile?.name)
 
       if (editingId) {
-        console.log(`Sending PUT request to /api/pembayaran/${editingId}`)
-        await axios.put(`/api/pembayaran/${editingId}`, kontrakData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        const { data, error } = await db.pembayaran.update(editingId, pembayaranData)
+        if (error) {
+          console.error('Update error:', error)
+          alert('Gagal update pembayaran: ' + error.message)
+          return
+        }
         alert('Kontrak berhasil diupdate!')
       } else {
-        console.log('Sending POST request to /api/pembayaran')
-        await api.post('/api/pembayaran', kontrakData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        const { data, error } = await db.pembayaran.create(pembayaranData)
+        if (error) {
+          console.error('Create error:', error)
+          alert('Gagal membuat pembayaran: ' + error.message)
+          return
+        }
         alert('Kontrak berhasil dibuat!')
       }
       
@@ -327,7 +370,7 @@ function Pembayaran() {
       fetchData()
     } catch (error) {
       console.error('Submit error:', error)
-      alert('Gagal menyimpan kontrak: ' + (error.response?.data?.error || error.message))
+      alert('Gagal menyimpan kontrak: ' + error.message)
     }
   }
 
@@ -381,51 +424,77 @@ function Pembayaran() {
     }
 
     try {
-      const formDataToSend = new FormData()
-      
-      // Data untuk riwayat pembayaran baru
-      formDataToSend.append('jumlah_dibayar', addPaymentData.jumlah_tambahan)
-      formDataToSend.append('metode_bayar', addPaymentData.metode_bayar)
-      formDataToSend.append('keterangan', addPaymentData.keterangan || `Pembayaran tambahan Rp ${parseFloat(addPaymentData.jumlah_tambahan).toLocaleString('id-ID')}`)
-      
-      if (addPaymentFile) {
-        formDataToSend.append('kwitansi', addPaymentFile)
-      }
-
       console.log('=== TAMBAH RIWAYAT PEMBAYARAN ===')
       console.log('Pembayaran ID:', selectedPayment.id)
       console.log('Jumlah Tambahan:', addPaymentData.jumlah_tambahan)
 
+      // Upload kwitansi jika ada
+      let kwitansiPath = null
+      if (addPaymentFile) {
+        try {
+          const fileName = `${Date.now()}-${addPaymentFile.name}`
+          const { data: uploadData, error: uploadError } = await storage.upload('kwitansi-receipts', fileName, addPaymentFile)
+          
+          if (uploadError) {
+            console.error('Upload error:', uploadError)
+            alert('Gagal upload kwitansi: ' + uploadError.message)
+            return
+          }
+          
+          kwitansiPath = fileName
+        } catch (uploadError) {
+          console.error('Upload error:', uploadError)
+          alert('Gagal upload kwitansi: ' + uploadError.message)
+          return
+        }
+      }
+
+      // Data untuk riwayat pembayaran baru
+      const riwayatData = {
+        pembayaran_id: selectedPayment.id,
+        jumlah_dibayar: parseFloat(addPaymentData.jumlah_tambahan),
+        metode_bayar: addPaymentData.metode_bayar,
+        keterangan: addPaymentData.keterangan || `Pembayaran tambahan Rp ${parseFloat(addPaymentData.jumlah_tambahan).toLocaleString('id-ID')}`,
+        tanggal_bayar: new Date().toISOString(),
+        kwitansi_path: kwitansiPath
+      }
+
       // Tambah riwayat pembayaran baru
-      await axios.post(`/api/pembayaran/${selectedPayment.id}/riwayat`, formDataToSend, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      const { data: riwayatResult, error: riwayatError } = await db.pembayaran.addRiwayat(riwayatData)
+      if (riwayatError) {
+        console.error('Riwayat error:', riwayatError)
+        alert('Gagal menambah riwayat pembayaran: ' + riwayatError.message)
+        return
+      }
 
       // Update total uang_dibayar di tabel pembayaran utama
       const currentPaid = parseFloat(selectedPayment.uang_dibayar || selectedPayment.nominal || 0)
       const additionalAmount = parseFloat(addPaymentData.jumlah_tambahan)
       const newTotalPaid = currentPaid + additionalAmount
       
-      const updateFormData = new FormData()
-      updateFormData.append('penyewa_id', selectedPayment.penyewa_id)
-      updateFormData.append('total_biaya', selectedPayment.nominal)
-      updateFormData.append('uang_dibayar', newTotalPaid)
-      updateFormData.append('tanggal_mulai', selectedPayment.tanggal_mulai || selectedPayment.tanggal_bayar)
-      updateFormData.append('tanggal_akhir', selectedPayment.tanggal_akhir || '')
-      updateFormData.append('metode_bayar', addPaymentData.metode_bayar)
-      updateFormData.append('status', 'pending')
+      const updateData = {
+        uang_dibayar: newTotalPaid,
+        metode_bayar: addPaymentData.metode_bayar
+      }
 
-      await api.put(`/api/pembayaran/${selectedPayment.id}`, updateFormData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      const { data: updateResult, error: updateError } = await db.pembayaran.update(selectedPayment.id, updateData)
+      if (updateError) {
+        console.error('Update error:', updateError)
+        alert('Gagal update pembayaran: ' + updateError.message)
+        return
+      }
       
       alert(`Berhasil menambah pembayaran Rp ${additionalAmount.toLocaleString('id-ID')}!\nTotal dibayar sekarang: Rp ${newTotalPaid.toLocaleString('id-ID')}`)
       setShowAddPaymentModal(false)
       
       // Refresh payment history after adding new payment
       try {
-        const historyResponse = await axios.get(`/api/pembayaran/${selectedPayment.id}/riwayat`)
-        setPaymentHistory(historyResponse.data || [])
+        const { data: historyData, error: historyError } = await db.pembayaran.getRiwayat(selectedPayment.id)
+        if (historyError) {
+          console.error('Error refreshing payment history:', historyError)
+        } else {
+          setPaymentHistory(historyData || [])
+        }
       } catch (error) {
         console.error('Error refreshing payment history:', error)
       }
@@ -433,7 +502,7 @@ function Pembayaran() {
       fetchData()
     } catch (error) {
       console.error('Add payment error:', error)
-      alert('Gagal menambah pembayaran: ' + (error.response?.data?.error || error.message))
+      alert('Gagal menambah pembayaran: ' + error.message)
     }
   }
 
@@ -465,7 +534,8 @@ function Pembayaran() {
     
     // Set preview gambar kwitansi jika ada
     if (item.kwitansi_path) {
-      setPreview(`http://localhost:8080${item.kwitansi_path}`)
+      const kwitansiUrl = getKwitansiUrl(item.kwitansi_path)
+      setPreview(kwitansiUrl)
       // Buat object file dummy untuk preview
       setSelectedFile({
         name: 'kwitansi_existing.jpg',
@@ -494,19 +564,36 @@ function Pembayaran() {
   const handleViewDetail = async (item) => {
     console.log('=== DEBUG PAYMENT DETAIL ===')
     console.log('Selected Payment Data:', item)
-    console.log('NIK:', item.nik)
-    console.log('Email:', item.email)
-    console.log('Telepon:', item.telepon)
-    console.log('Alamat:', item.alamat)
-    console.log('KTP Path:', item.ktp_path)
+    console.log('NIK:', item.penyewa?.nik)
+    console.log('Email:', item.penyewa?.email)
+    console.log('Telepon:', item.penyewa?.telepon)
+    console.log('Alamat:', item.penyewa?.alamat)
+    console.log('KTP Path:', item.penyewa?.ktp_path)
     console.log('=== END DEBUG ===')
-    setSelectedPayment(item)
+    
+    // Flatten penyewa data for easier access in the modal
+    const flattenedItem = {
+      ...item,
+      nama_penyewa: item.penyewa?.nama || item.nama_penyewa,
+      nik: item.penyewa?.nik || item.nik,
+      email: item.penyewa?.email || item.email,
+      telepon: item.penyewa?.telepon || item.telepon,
+      alamat: item.penyewa?.alamat || item.alamat,
+      ktp_path: item.penyewa?.ktp_path || item.ktp_path
+    }
+    
+    setSelectedPayment(flattenedItem)
     
     // Fetch payment history
     try {
-      const response = await api.get(`/api/pembayaran/${item.id}/riwayat`)
-      setPaymentHistory(response.data || [])
-      console.log('Payment history loaded:', response.data)
+      const { data: historyData, error: historyError } = await db.pembayaran.getRiwayat(item.id)
+      if (historyError) {
+        console.error('Error fetching payment history:', historyError)
+        setPaymentHistory([])
+      } else {
+        setPaymentHistory(historyData || [])
+        console.log('Payment history loaded:', historyData)
+      }
     } catch (error) {
       console.error('Error fetching payment history:', error)
       setPaymentHistory([])
@@ -672,13 +759,25 @@ function Pembayaran() {
   }
 
   const handleDelete = async (id) => {
+    if (isDemo()) {
+      alert('⚠️ Akses Ditolak\n\nAkun demo hanya dapat melihat data.\nUntuk mencoba fitur lengkap, silakan login dengan akun admin.')
+      return
+    }
+    
     if (!confirm('Yakin ingin menghapus pembayaran ini?')) return
     
     try {
-      await api.delete(`/api/pembayaran/${id}`)
+      const { error } = await db.pembayaran.delete(id)
+      if (error) {
+        console.error('Delete error:', error)
+        alert('Gagal menghapus pembayaran: ' + error.message)
+        return
+      }
+      
       alert('Pembayaran berhasil dihapus!')
       fetchData()
     } catch (error) {
+      console.error('Delete error:', error)
       alert('Gagal menghapus pembayaran: ' + error.message)
     }
   }
@@ -703,7 +802,7 @@ function Pembayaran() {
   }
 
   const filteredPembayaran = pembayaranList.filter(item => 
-    item.nama_penyewa?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.penyewa?.nama?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.metode_bayar?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
@@ -838,11 +937,11 @@ function Pembayaran() {
                         <div className="flex items-center gap-2 lg:gap-3">
                           <div className="w-6 lg:w-8 h-6 lg:h-8 bg-blue-100 rounded-full flex items-center justify-center">
                             <span className="text-blue-600 text-xs lg:text-sm font-semibold">
-                              {item.nama_penyewa?.charAt(0) || 'U'}
+                              {item.penyewa?.nama?.charAt(0) || 'U'}
                             </span>
                           </div>
                           <div className="min-w-0">
-                            <div className="font-medium text-gray-900 text-sm lg:text-base truncate">{item.nama_penyewa || 'Unknown'}</div>
+                            <div className="font-medium text-gray-900 text-sm lg:text-base truncate">{item.penyewa?.nama || 'Unknown'}</div>
                             <div className="text-xs text-gray-500 sm:hidden">Unit #{item.id}</div>
                             <div className="text-xs text-gray-500 md:hidden">
                               {item.tanggal_mulai ? formatTanggal(item.tanggal_mulai) : formatTanggal(item.tanggal_bayar)}
@@ -1347,7 +1446,7 @@ function Pembayaran() {
                             variant="outline" 
                             size="sm" 
                             className="text-blue-600"
-                            onClick={() => selectedPayment.kwitansi_path && handleImageClick(`http://localhost:8080${selectedPayment.kwitansi_path}`, 'Bukti Transfer/Pembayaran')}
+                            onClick={() => selectedPayment.kwitansi_path && handleImageClick(getKwitansiUrl(selectedPayment.kwitansi_path), 'Bukti Transfer/Pembayaran')}
                             disabled={!selectedPayment.kwitansi_path}
                           >
                             🔗 Lihat Ukuran Penuh
@@ -1358,10 +1457,10 @@ function Pembayaran() {
                           {selectedPayment.kwitansi_path ? (
                             <div className="space-y-3">
                               <img 
-                                src={`http://localhost:8080${selectedPayment.kwitansi_path}`}
+                                src={getKwitansiUrl(selectedPayment.kwitansi_path)}
                                 alt="Bukti Transfer" 
                                 className="max-w-full max-h-96 mx-auto rounded-lg shadow-md cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={() => handleImageClick(`http://localhost:8080${selectedPayment.kwitansi_path}`, 'Bukti Transfer/Pembayaran')}
+                                onClick={() => handleImageClick(getKwitansiUrl(selectedPayment.kwitansi_path), 'Bukti Transfer/Pembayaran')}
                                 onError={(e) => {
                                   console.log('Image load error:', e.target.src)
                                   e.target.style.display = 'none'
@@ -1426,10 +1525,10 @@ function Pembayaran() {
                             {selectedPayment.ktp_path ? (
                               <div className="flex items-center gap-2">
                                 <img 
-                                  src={`http://localhost:8080${selectedPayment.ktp_path}`}
+                                  src={getKtpUrl(selectedPayment.ktp_path)}
                                   alt="KTP" 
                                   className="w-16 h-10 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                                  onClick={() => handleImageClick(`http://localhost:8080${selectedPayment.ktp_path}`, 'Dokumen Identitas (KTP)')}
+                                  onClick={() => handleImageClick(getKtpUrl(selectedPayment.ktp_path), 'Dokumen Identitas (KTP)')}
                                   onError={(e) => {
                                     e.target.style.display = 'none'
                                     e.target.nextSibling.style.display = 'inline'
@@ -1498,7 +1597,7 @@ function Pembayaran() {
                                     </p>
                                     {history.kwitansi_path && (
                                       <button
-                                        onClick={() => handleImageClick(`http://localhost:8080${history.kwitansi_path}`, `Bukti Pembayaran #${index + 1}`)}
+                                        onClick={() => handleImageClick(getKwitansiUrl(history.kwitansi_path), `Bukti Pembayaran #${index + 1}`)}
                                         className="text-xs text-blue-600 hover:underline mt-1"
                                       >
                                         📄 Lihat bukti

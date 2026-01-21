@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Building2, User, Lock, Eye, EyeOff } from 'lucide-react'
-import api from '../lib/api'
+import { db } from '../lib/supabase'
 
 function Login() {
   const [formData, setFormData] = useState({
@@ -30,19 +29,62 @@ function Login() {
 
     try {
       console.log('Attempting login with:', formData)
-      const response = await api.post('/api/auth/login', formData)
       
-      if (response.data.success) {
-        // Simpan token atau session info
-        localStorage.setItem('user', JSON.stringify(response.data.user))
-        localStorage.setItem('isLoggedIn', 'true')
-        
-        // Redirect ke dashboard
-        window.location.href = '/'
+      // Mapping nama input ke nama di database
+      const nameMapping = {
+        'mamah': 'Mamah',
+        'admin': 'Admin', 
+        'demo': 'Demo User'
       }
+      
+      const dbName = nameMapping[formData.nama.toLowerCase()] || formData.nama
+      console.log('Searching for admin with name:', dbName)
+      
+      // Cari admin berdasarkan nama yang sudah dimapping
+      let { data: admin, error } = await db.admin.getByNama(dbName)
+      
+      if (error) {
+        console.error('Database error:', error)
+        setError('Terjadi kesalahan saat login')
+        return
+      }
+
+      if (!admin) {
+        setError('Nama pengguna tidak ditemukan')
+        return
+      }
+
+      // Untuk sederhananya, kita cek password langsung
+      // Di production, sebaiknya gunakan bcrypt atau Supabase Auth
+      const validPasswords = {
+        'mamah': '123',
+        'admin': '321', 
+        'demo': 'demo123'
+      }
+
+      if (validPasswords[formData.nama] !== formData.password) {
+        setError('Password salah')
+        return
+      }
+
+      // Login berhasil
+      const user = {
+        nama: admin.nama,
+        email: admin.email,
+        role: admin.role
+      }
+
+      localStorage.setItem('user', JSON.stringify(user))
+      localStorage.setItem('isLoggedIn', 'true')
+      
+      console.log('Login successful:', user)
+      
+      // Redirect ke dashboard
+      window.location.href = '/'
+      
     } catch (error) {
       console.error('Login error:', error)
-      setError(error.response?.data?.error || 'Login gagal. Periksa nama dan password Anda.')
+      setError('Terjadi kesalahan: ' + error.message)
     } finally {
       setLoading(false)
     }

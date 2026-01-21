@@ -2,9 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Home, Users, CreditCard, Building2, LogOut, Eye, Menu, X } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useState, useEffect } from 'react'
-import axios from 'axios'
 import { getCurrentUser, getRoleDisplayName, isDemo } from '../lib/auth'
-import api from '../lib/api'
 
 function Layout() {
   const location = useLocation()
@@ -31,10 +29,15 @@ function Layout() {
 
   const handleLogout = async () => {
     try {
-      await api.post('/api/auth/logout')
+      // Clear local storage
+      localStorage.removeItem('user')
+      localStorage.removeItem('isLoggedIn')
+      
+      // Redirect to login
+      window.location.href = '/login'
     } catch (error) {
       console.error('Logout error:', error)
-    } finally {
+      // Even if there's an error, still clear local storage and redirect
       localStorage.removeItem('user')
       localStorage.removeItem('isLoggedIn')
       window.location.href = '/login'

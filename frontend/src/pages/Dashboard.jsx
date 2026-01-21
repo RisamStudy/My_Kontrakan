@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
 import { TrendingUp, Building2, AlertCircle, Edit, Trash2 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
-import api from '../lib/api'
+import { db, storage } from '../lib/supabase'
+import { canDelete } from '../lib/auth'
 
 function Dashboard() {
   const [stats, setStats] = useState({
@@ -22,10 +22,10 @@ function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      console.log('=== FETCHING DASHBOARD DATA ===')
-      const response = await api.get('/api/dashboard/stats')
-      console.log('Dashboard stats received:', response.data)
-      setStats(response.data)
+      console.log('=== FETCHING DASHBOARD DATA FROM SUPABASE ===')
+      const stats = await db.stats.getDashboard()
+      console.log('Dashboard stats received:', stats)
+      setStats(stats)
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
     }
@@ -33,22 +33,38 @@ function Dashboard() {
 
   const fetchProperti = async () => {
     try {
-      const response = await api.get('/api/properti')
-      setPropertiList(response.data || [])
+      const { data, error } = await db.properti.getAll()
+      if (error) {
+        console.error('Error fetching properti:', error)
+        return
+      }
+      setPropertiList(data || [])
     } catch (error) {
       console.error('Error fetching properti:', error)
     }
   }
 
   const handleDelete = async (id) => {
+    if (!canDelete()) {
+      alert('Anda tidak memiliki izin untuk menghapus data')
+      return
+    }
+    
     if (!confirm('Yakin ingin menghapus properti ini?')) return
     
     try {
-      await axios.delete(`/api/properti/${id}`)
+      const { error } = await db.properti.delete(id)
+      if (error) {
+        console.error('Delete error:', error)
+        alert('Gagal menghapus properti: ' + error.message)
+        return
+      }
+      
       alert('Properti berhasil dihapus!')
       fetchDashboardData()
       fetchProperti()
     } catch (error) {
+      console.error('Delete error:', error)
       alert('Gagal menghapus properti: ' + error.message)
     }
   }
@@ -165,7 +181,7 @@ function Dashboard() {
                       <td className="py-3 lg:py-4 px-2 lg:px-4">
                         <div className="flex items-center gap-2 lg:gap-3">
                           {item.foto_path ? (
-                            <img src={`http://localhost:8080${item.foto_path}`} alt={item.nama_unit} className="w-8 lg:w-12 h-8 lg:h-12 rounded-lg object-cover" />
+                            <img src={storage.getPublicUrl('properti-photos', item.foto_path)} alt={item.nama_unit} className="w-8 lg:w-12 h-8 lg:h-12 rounded-lg object-cover" />
                           ) : (
                             <div className="w-8 lg:w-12 h-8 lg:h-12 bg-gray-200 rounded-lg flex items-center justify-center">
                               <Building2 className="w-4 lg:w-6 h-4 lg:h-6 text-gray-400" />
@@ -183,9 +199,11 @@ function Dashboard() {
                           <Button variant="ghost" size="sm" onClick={() => window.location.href = '/properti'}>
                             <Edit className="w-3 lg:w-4 h-3 lg:h-4 text-blue-600" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(item.id)}>
-                            <Trash2 className="w-3 lg:w-4 h-3 lg:h-4 text-red-600" />
-                          </Button>
+                          {canDelete() && (
+                            <Button variant="ghost" size="sm" onClick={() => handleDelete(item.id)}>
+                              <Trash2 className="w-3 lg:w-4 h-3 lg:h-4 text-red-600" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

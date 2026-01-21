@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
 import { UserPlus, Edit, Trash2, Search, Filter, Eye, ArrowLeft } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent } from '../components/ui/Card'
@@ -7,7 +6,7 @@ import { Badge } from '../components/ui/Badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog'
 import { Input } from '../components/ui/Input'
 import { canCreate, canEdit, canDelete, isDemo } from '../lib/auth'
-import api from '../lib/api'
+import { db, storage } from '../lib/supabase'
 
 function Penyewa() {
   const [showModal, setShowModal] = useState(false)
@@ -31,8 +30,12 @@ function Penyewa() {
 
   const fetchPenyewa = async () => {
     try {
-      const response = await api.get('/api/penyewa')
-      setPenyewaList(response.data || [])
+      const { data, error } = await db.penyewa.getAll()
+      if (error) {
+        console.error('Error fetching penyewa:', error)
+        return
+      }
+      setPenyewaList(data || [])
     } catch (error) {
       console.error('Error fetching penyewa:', error)
     }
@@ -53,27 +56,51 @@ function Penyewa() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      // Gunakan FormData untuk upload file
-      const formDataToSend = new FormData()
-      formDataToSend.append('nama', formData.nama)
-      formDataToSend.append('nik', formData.nik)
-      formDataToSend.append('email', formData.email)
-      formDataToSend.append('telepon', formData.telepon)
-      formDataToSend.append('alamat', formData.alamat)
-      
+      // Siapkan data penyewa
+      const penyewaData = {
+        nama: formData.nama,
+        nik: formData.nik || null,
+        email: formData.email || null,
+        telepon: formData.telepon,
+        alamat: formData.alamat || null,
+        status_bayar: 'belum_bayar'
+      }
+
+      // Upload KTP jika ada
       if (selectedFile) {
-        formDataToSend.append('ktp', selectedFile)
+        try {
+          const fileName = `${Date.now()}-${selectedFile.name}`
+          const { data: uploadData, error: uploadError } = await storage.upload('ktp-documents', fileName, selectedFile)
+          
+          if (uploadError) {
+            console.error('Upload error:', uploadError)
+            alert('Gagal upload KTP: ' + uploadError.message)
+            return
+          }
+          
+          penyewaData.ktp_path = fileName
+        } catch (uploadError) {
+          console.error('Upload error:', uploadError)
+          alert('Gagal upload KTP: ' + uploadError.message)
+          return
+        }
       }
       
       if (editingId) {
-        await api.put(`/api/penyewa/${editingId}`, formDataToSend, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        const { data, error } = await db.penyewa.update(editingId, penyewaData)
+        if (error) {
+          console.error('Update error:', error)
+          alert('Gagal update penyewa: ' + error.message)
+          return
+        }
         alert('Penyewa berhasil diupdate!')
       } else {
-        await api.post('/api/penyewa', formDataToSend, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        const { data, error } = await db.penyewa.create(penyewaData)
+        if (error) {
+          console.error('Create error:', error)
+          alert('Gagal menambah penyewa: ' + error.message)
+          return
+        }
         alert('Penyewa berhasil ditambahkan!')
       }
       
@@ -101,13 +128,24 @@ function Penyewa() {
   }
 
   const handleDelete = async (id) => {
+    if (!canDelete()) {
+      alert('Anda tidak memiliki izin untuk menghapus data')
+      return
+    }
+    
     if (!confirm('Yakin ingin menghapus penyewa ini?')) return
     
     try {
-      await api.delete(`/api/penyewa/${id}`)
+      const { error } = await db.penyewa.delete(id)
+      if (error) {
+        console.error('Delete error:', error)
+        alert('Gagal menghapus penyewa: ' + error.message)
+        return
+      }
       alert('Penyewa berhasil dihapus!')
       fetchPenyewa()
     } catch (error) {
+      console.error('Delete error:', error)
       alert('Gagal menghapus penyewa: ' + error.message)
     }
   }
