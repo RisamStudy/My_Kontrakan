@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <!-- Background with rounded corners for iOS -->
+  <rect x="0" y="0" width="180" height="180" rx="40" ry="40" fill="#2563eb"/>
+  
+  <!-- House icon -->
+  <g fill="white">
+    <!-- Roof -->
+    <path d="M45 81 L90 45 L135 81 L126 81 L90 54 L54 81 Z"/>
+    
+    <!-- House body -->
+    <rect x="54" y="75" width="72" height="54" rx="4"/>
+    
+    <!-- Door -->
+    <rect x="81" y="99" width="18" height="30" fill="#2563eb" rx="2"/>
+    <circle cx="94" cy="114" r="1.5" fill="white"/>
+    
+    <!-- Windows -->
+    <rect x="63" y="86" width="14" height="14" fill="#2563eb" rx="2"/>
+    <rect x="103" y="86" width="14" height="14" fill="#2563eb" rx="2"/>
+    
+    <!-- Window frames -->
+    <line x1="70" y1="86" x2="70" y2="100" stroke="white" stroke-width="1"/>
+    <line x1="63" y1="93" x2="77" y2="93" stroke="white" stroke-width="1"/>
+    <line x1="110" y1="86" x2="110" y2="100" stroke="white" stroke-width="1"/>
+    <line x1="103" y1="93" x2="117" y2="93" stroke="white" stroke-width="1"/>
+  </g>
+  
+  <!-- "K" letter -->
+  <text x="90" y="152" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="white" text-anchor="middle">K</text>
+</svg>

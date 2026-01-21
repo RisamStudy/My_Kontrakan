@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="230" fill="#2563eb" stroke="#1d4ed8" stroke-width="10"/>
+  
+  <!-- House icon -->
+  <g fill="white">
+    <!-- Roof -->
+    <path d="M128 230 L256 128 L384 230 L358 230 L256 154 L154 230 Z"/>
+    
+    <!-- House body -->
+    <rect x="154" y="214" width="204" height="154" rx="10"/>
+    
+    <!-- Door -->
+    <rect x="230" y="282" width="52" height="86" fill="#2563eb" rx="5"/>
+    <circle cx="266" cy="325" r="5" fill="white"/>
+    
+    <!-- Windows -->
+    <rect x="179" y="245" width="40" height="40" fill="#2563eb" rx="5"/>
+    <rect x="293" y="245" width="40" height="40" fill="#2563eb" rx="5"/>
+    
+    <!-- Window frames -->
+    <line x1="199" y1="245" x2="199" y2="285" stroke="white" stroke-width="3"/>
+    <line x1="179" y1="265" x2="219" y2="265" stroke="white" stroke-width="3"/>
+    <line x1="313" y1="245" x2="313" y2="285" stroke="white" stroke-width="3"/>
+    <line x1="293" y1="265" x2="333" y2="265" stroke="white" stroke-width="3"/>
+  </g>
+  
+  <!-- Large "K" letter -->
+  <text x="256" y="432" font-family="Arial, sans-serif" font-size="64" font-weight="bold" fill="white" text-anchor="middle">K</text>
+</svg>

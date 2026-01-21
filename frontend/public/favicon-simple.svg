@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Simple version for small sizes -->
+  <rect x="0" y="0" width="32" height="32" rx="6" fill="#2563eb"/>
+  
+  <!-- Simple house -->
+  <g fill="white">
+    <!-- Roof -->
+    <path d="M8 14 L16 8 L24 14 L22 14 L16 10 L10 14 Z"/>
+    
+    <!-- House body -->
+    <rect x="10" y="13" width="12" height="10" rx="1"/>
+    
+    <!-- Door -->
+    <rect x="14" y="18" width="4" height="5" fill="#2563eb"/>
+    
+    <!-- Windows -->
+    <rect x="11" y="15" width="3" height="3" fill="#2563eb"/>
+    <rect x="18" y="15" width="3" height="3" fill="#2563eb"/>
+  </g>
+  
+  <!-- Small K -->
+  <text x="16" y="29" font-family="Arial, sans-serif" font-size="6" font-weight="bold" fill="white" text-anchor="middle">K</text>
+</svg>

@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: kontrakanku-api
+    env: go
+    region: singapore
+    plan: free
+    buildCommand: go build -o main .
+    startCommand: ./main
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: DB_HOST
+        fromDatabase:
+          name: kontrakanku-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: kontrakanku-db
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: kontrakanku-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: kontrakanku-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: kontrakanku-db
+          property: database
+      - key: GIN_MODE
+        value: release
+
+databases:
+  - name: kontrakanku-db
+    databaseName: kontrakanku
+    user: kontrakanku
+    region: singapore
+    plan: free

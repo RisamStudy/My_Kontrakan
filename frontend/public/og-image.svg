@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <rect x="0" y="0" width="1200" height="630" fill="url(#bgGradient)"/>
+  
+  <!-- Main content -->
+  <g fill="white">
+    <!-- Large house icon -->
+    <g transform="translate(150, 150)">
+      <!-- Roof -->
+      <path d="M50 100 L150 50 L250 100 L230 100 L150 70 L70 100 Z"/>
+      
+      <!-- House body -->
+      <rect x="70" y="90" width="160" height="120" rx="8" fill="white"/>
+      
+      <!-- Door -->
+      <rect x="135" y="150" width="30" height="60" fill="#2563eb" rx="4"/>
+      <circle cx="155" cy="180" r="3" fill="white"/>
+      
+      <!-- Windows -->
+      <rect x="90" y="110" width="25" height="25" fill="#2563eb" rx="3"/>
+      <rect x="185" y="110" width="25" height="25" fill="#2563eb" rx="3"/>
+      
+      <!-- Window frames -->
+      <line x1="102.5" y1="110" x2="102.5" y2="135" stroke="#2563eb" stroke-width="2"/>
+      <line x1="90" y1="122.5" x2="115" y2="122.5" stroke="#2563eb" stroke-width="2"/>
+      <line x1="197.5" y1="110" x2="197.5" y2="135" stroke="#2563eb" stroke-width="2"/>
+      <line x1="185" y1="122.5" x2="210" y2="122.5" stroke="#2563eb" stroke-width="2"/>
+    </g>
+    
+    <!-- Title -->
+    <text x="600" y="200" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="white" text-anchor="middle">KontrakanKu</text>
+    
+    <!-- Subtitle -->
+    <text x="600" y="260" font-family="Arial, sans-serif" font-size="36" fill="rgba(255,255,255,0.9)" text-anchor="middle">Sistem Manajemen Kontrakan</text>
+    
+    <!-- Features -->
+    <g font-family="Arial, sans-serif" font-size="24" fill="rgba(255,255,255,0.8)">
+      <text x="600" y="350" text-anchor="middle">✓ Manajemen Properti</text>
+      <text x="600" y="390" text-anchor="middle">✓ Pembayaran & Kwitansi</text>
+      <text x="600" y="430" text-anchor="middle">✓ Upload Dokumen</text>
+      <text x="600" y="470" text-anchor="middle">✓ Laporan Lengkap</text>
+    </g>
+    
+    <!-- URL -->
+    <text x="600" y="550" font-family="Arial, sans-serif" font-size="28" fill="rgba(255,255,255,0.7)" text-anchor="middle">kontrakanku.vercel.app</text>
+  </g>
+</svg>
