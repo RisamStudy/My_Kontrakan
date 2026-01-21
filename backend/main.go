@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/joho/godotenv"
 )
 
@@ -68,12 +69,16 @@ func main() {
 
 	var err error
 	var dsn string
+	var dbDriver string
 	
-	// Cek apakah menggunakan DATABASE_URL (untuk kompatibilitas) atau environment variables terpisah
+	// Cek apakah menggunakan DATABASE_URL (PostgreSQL di Render) atau MySQL lokal
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		// PostgreSQL (Render)
 		dsn = databaseURL
+		dbDriver = "postgres"
+		log.Printf("Using PostgreSQL (Render)")
 	} else {
-		// Gunakan environment variables terpisah (untuk Render)
+		// MySQL (Development) - gunakan environment variables terpisah
 		dbHost := os.Getenv("DB_HOST")
 		dbPort := os.Getenv("DB_PORT")
 		dbUser := os.Getenv("DB_USER")
@@ -95,10 +100,12 @@ func main() {
 		
 		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", 
 			dbUser, dbPassword, dbHost, dbPort, dbName)
+		dbDriver = "mysql"
+		log.Printf("Using MySQL (Development)")
 	}
 	
 	log.Printf("Connecting to database...")
-	db, err = sql.Open("mysql", dsn)
+	db, err = sql.Open(dbDriver, dsn)
 	if err != nil {
 		log.Fatal("Database connection failed:", err)
 	}
